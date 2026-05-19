@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Профиль - Цифровой каталог библиотеки</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .profile-container { max-width: 1200px; margin: 0 auto; padding: 40px; }
+        .profile-top { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; }
+        .profile-header { background: var(--card-bg); padding: 30px; border-radius: 15px; box-shadow: var(--shadow); margin-bottom: 30px; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .tab { padding: 12px 24px; background: var(--card-bg); border: 2px solid var(--border-color); border-radius: 8px; cursor: pointer; transition: all 0.3s; font-weight: 600; }
+        .tab:hover { border-color: var(--primary-color); }
+        .tab.active { background: var(--primary-color); color: white; border-color: var(--primary-color); }
+        .favorites-section { display: none; }
+        .favorites-section.active { display: block; }
+        .favorites-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; }
+        .favorite-card { background: var(--card-bg); padding: 20px; border-radius: 12px; box-shadow: var(--shadow); position: relative; }
+        .favorite-card .book-cover { width: 100%; height: 200px; object-fit: cover; border-radius: 8px; margin-bottom: 15px; }
+        .cover-placeholder { display: flex; align-items: center; justify-content: center; color: var(--text-light); font-size: 14px; font-weight: 600; background: var(--border-color); }
+        .status-select { width: 100%; padding: 8px; border: 2px solid var(--border-color); border-radius: 8px; margin-top: 10px; }
+        .delete-btn { position: absolute; top: 10px; right: 10px; background: #e74c3c; color: white; border: none; border-radius: 50%; width: 30px; height: 30px; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; }
+        .logout-btn { padding: 10px 20px; background: #e74c3c; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
+        .empty-favorites { text-align: center; padding: 60px 20px; color: var(--text-light); }
+        .settings-panel { background: var(--card-bg); padding: 24px; border-radius: 12px; box-shadow: var(--shadow); max-width: 560px; }
+        .settings-panel .form-row { margin-bottom: 16px; }
+        .settings-panel label { display: block; font-weight: 600; margin-bottom: 6px; color: var(--text-color); }
+        .settings-panel input[type="text"], .settings-panel input[type="email"] { width: 100%; padding: 10px; border: 2px solid var(--border-color); border-radius: 8px; font-size: 15px; }
+        .settings-panel input[readonly] { background: var(--bg-color); color: var(--text-light); }
+        .btn-primary { padding: 10px 18px; background: var(--primary-color); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; margin-top: 8px; margin-right: 8px; }
+        .btn-primary:hover { background: var(--primary-dark); }
+        .badge-ok { display: inline-block; margin-top: 8px; padding: 6px 12px; background: #d4edda; color: #155724; border-radius: 8px; font-weight: 600; font-size: 14px; }
+        .verify-block { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border-color); }
+        .msg { margin-top: 10px; font-size: 14px; }
+        .msg.err { color: #c33; }
+        .msg.ok { color: #2a6; }
+        #codeRow { display: none; margin-top: 12px; }
+        #codeRow.visible { display: block; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
+            {% include 'partials/theme_bar.html' %}
+        </div>
+        {% include 'partials/site_branding.html' %}
+        {% include 'partials/nav_home.html' %}
+        <div class="profile-container">
+            <div class="profile-top">
+                <h1 style="margin:0;">Профиль</h1>
+                <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:flex-end;">
+                    <button type="button" class="logout-btn" onclick="logout()">Выйти</button>
+                </div>
+            </div>
+
+            <div class="tabs">
+                <div class="tab active" data-tab="settings" onclick="switchTab('settings')">Настройки профиля</div>
+                <div class="tab" data-tab="favorite" onclick="switchTab('favorite')">Избранное</div>
+                <div class="tab" data-tab="read" onclick="switchTab('read')">Прочитанное</div>
+                <div class="tab" data-tab="reading" onclick="switchTab('reading')">В процессе чтения</div>
+                <div class="tab" data-tab="planned" onclick="switchTab('planned')">Планируемое для прочтения</div>
+                <div class="tab" data-tab="read_complete" onclick="switchTab('read_complete')">Прочтенное</div>
+            </div>
+
+            <div id="settingsSection" class="favorites-section active">
+                <div class="settings-panel" id="settingsPanel">
+                    <div class="form-row">
+                        <label for="setFirstName">Имя</label>
+                        <input type="text" id="setFirstName" autocomplete="given-name">
+                    </div>
+                    <div class="form-row">
+                        <label for="setLastName">Фамилия</label>
+                        <input type="text" id="setLastName" autocomplete="family-name">
+                    </div>
+                    <div class="form-row">
+                        <label for="setEmail">Почта</label>
+                        <input type="email" id="setEmail" readonly>
+                    </div>
+                    <div class="form-row">
+                        <label>Дата регистрации</label>
+                        <input type="text" id="setCreated" readonly>
+                    </div>
+                    <button type="button" class="btn-primary" onclick="saveProfileNames()">Сохранить имя и фамилию</button>
+                    <div id="settingsSaveMsg" class="msg"></div>
+
+                    <div class="verify-block">
+                        <h3 style="margin-bottom:12px;font-size:1.1em;">Подтверждение почты (Mail.ru)</h3>
+                        <p style="color:var(--text-light);font-size:14px;margin-bottom:12px;">На почту аккаунта отправляется четырёхзначный код.</p>
+                        <div id="verifiedBadge" class="badge-ok" style="display:none;">Почта подтверждена</div>
+                        <div id="verifyActions" style="margin-top:12px;">
+                            <button type="button" class="btn-primary" id="btnSendCode" onclick="sendVerificationCode()">Подтвердить аккаунт</button>
+                        </div>
+                        <div id="codeRow">
+                            <label for="verifyCode">Код из письма</label>
+                            <input type="text" id="verifyCode" maxlength="4" inputmode="numeric" pattern="[0-9]*" placeholder="0000" style="max-width:140px;">
+                            <button type="button" class="btn-primary" onclick="submitVerificationCode()">Проверить код</button>
+                        </div>
+                        <div id="verifyMsg" class="msg"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="favoriteSection" class="favorites-section">
+                <h2>Избранное</h2>
+                <div class="favorites-grid" id="favoriteGrid"></div>
+            </div>
+            <div id="readSection" class="favorites-section">
+                <h2>Прочитанное</h2>
+                <div class="favorites-grid" id="readGrid"></div>
+            </div>
+            <div id="readingSection" class="favorites-section">
+                <h2>В процессе чтения</h2>
+                <div class="favorites-grid" id="readingGrid"></div>
+            </div>
+            <div id="plannedSection" class="favorites-section">
+                <h2>Планируемое для прочтения</h2>
+                <div class="favorites-grid" id="plannedGrid"></div>
+            </div>
+            <div id="readCompleteSection" class="favorites-section">
+                <h2>Прочтенное</h2>
+                <div class="favorites-grid" id="readCompleteGrid"></div>
+            </div>
+
+        </div>
+
+        {% include 'partials/site_footer.html' %}
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+        let currentTab = 'settings';
+        let currentUser = null;
+
+        async function checkAuth() {
+            try {
+                const response = await fetch(`${API_BASE}/user`, { credentials: 'include' });
+                const data = await response.json();
+                if (!response.ok || !data.user) {
+                    window.location.href = '/';
+                    return;
+                }
+                currentUser = data.user;
+                fillSettingsForm(data.user);
+                loadFavorites();
+                const initialTab = new URLSearchParams(window.location.search).get('tab');
+                const profileTabs = ['settings', 'favorite', 'read', 'reading', 'planned', 'read_complete'];
+                if (initialTab && profileTabs.includes(initialTab) && initialTab !== 'settings') {
+                    switchTab(initialTab);
+                }
+            } catch (e) {
+                window.location.href = '/';
+            }
+        }
+
+        function fillSettingsForm(user) {
+            document.getElementById('setFirstName').value = user.first_name || '';
+            document.getElementById('setLastName').value = user.last_name || '';
+            document.getElementById('setEmail').value = user.email || '';
+            document.getElementById('setCreated').value = user.created_at
+                ? new Date(user.created_at).toLocaleDateString('ru-RU')
+                : '';
+            const verified = !!user.email_verified;
+            document.getElementById('verifiedBadge').style.display = verified ? 'inline-block' : 'none';
+            document.getElementById('verifyActions').style.display = verified ? 'none' : 'block';
+            document.getElementById('codeRow').classList.remove('visible');
+            document.getElementById('verifyCode').value = '';
+            document.getElementById('verifyMsg').textContent = '';
+            document.getElementById('verifyMsg').className = 'msg';
+        }
+
+        async function saveProfileNames() {
+            const msg = document.getElementById('settingsSaveMsg');
+            msg.textContent = '';
+            const first_name = document.getElementById('setFirstName').value.trim();
+            const last_name = document.getElementById('setLastName').value.trim();
+            try {
+                const r = await fetch(`${API_BASE}/user/profile`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ first_name, last_name })
+                });
+                const d = await r.json();
+                if (!r.ok) {
+                    msg.textContent = d.error || 'Ошибка сохранения';
+                    msg.className = 'msg err';
+                    return;
+                }
+                msg.textContent = 'Сохранено';
+                msg.className = 'msg ok';
+                if (currentUser) {
+                    currentUser.first_name = first_name;
+                    currentUser.last_name = last_name;
+                }
+            } catch (e) {
+                msg.textContent = 'Нет связи с сервером';
+                msg.className = 'msg err';
+            }
+        }
+
+        async function sendVerificationCode() {
+            const msg = document.getElementById('verifyMsg');
+            msg.textContent = '';
+            msg.className = 'msg';
+            try {
+                const r = await fetch(`${API_BASE}/user/request-email-code`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({})
+                });
+                const d = await r.json();
+                if (!r.ok) {
+                    msg.textContent = d.error || 'Ошибка';
+                    msg.className = 'msg err';
+                    return;
+                }
+                msg.textContent = d.message || 'Код отправлен';
+                msg.className = 'msg ok';
+                document.getElementById('codeRow').classList.add('visible');
+            } catch (e) {
+                msg.textContent = 'Нет связи с сервером';
+                msg.className = 'msg err';
+            }
+        }
+
+        async function submitVerificationCode() {
+            const msg = document.getElementById('verifyMsg');
+            msg.textContent = '';
+            const code = document.getElementById('verifyCode').value.trim();
+            try {
+                const r = await fetch(`${API_BASE}/user/confirm-email-code`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ code })
+                });
+                const d = await r.json();
+                if (!r.ok) {
+                    msg.textContent = d.error || 'Ошибка';
+                    msg.className = 'msg err';
+                    return;
+                }
+                msg.textContent = d.message || 'Готово';
+                msg.className = 'msg ok';
+                if (currentUser) currentUser.email_verified = true;
+                fillSettingsForm({ ...currentUser, email_verified: true });
+            } catch (e) {
+                msg.textContent = 'Нет связи с сервером';
+                msg.className = 'msg err';
+            }
+        }
+
+        async function loadFavorites() {
+            try {
+                const response = await fetch(`${API_BASE}/favorites`, { credentials: 'include' });
+                const data = await response.json();
+                if (data.error) return;
+                displayFavorites(data.favorites || []);
+            } catch (e) { /* ignore */ }
+        }
+
+        function displayFavorites(favorites) {
+            const statusMap = {
+                favorite: { grid: 'favoriteGrid' },
+                read: { grid: 'readGrid' },
+                reading: { grid: 'readingGrid' },
+                planned: { grid: 'plannedGrid' },
+                read_complete: { grid: 'readCompleteGrid' }
+            };
+            Object.values(statusMap).forEach(({ grid }) => {
+                document.getElementById(grid).innerHTML = '';
+            });
+            const grouped = {};
+            favorites.forEach(fav => {
+                if (!grouped[fav.status]) grouped[fav.status] = [];
+                grouped[fav.status].push(fav);
+            });
+            Object.entries(grouped).forEach(([status, items]) => {
+                const { grid } = statusMap[status] || statusMap.favorite;
+                const gridEl = document.getElementById(grid);
+                items.forEach(fav => gridEl.appendChild(createFavoriteCard(fav)));
+            });
+            const currentStatus = getStatusFromTab(currentTab);
+            if (currentTab !== 'settings') {
+                const g = statusMap[currentStatus]?.grid || 'favoriteGrid';
+                const el = document.getElementById(g);
+                if (el && el.children.length === 0) {
+                    el.innerHTML = '<div class="empty-favorites">Нет книг в этом разделе</div>';
+                }
+            }
+        }
+
+        function createFavoriteCard(favorite) {
+            const card = document.createElement('div');
+            card.className = 'favorite-card';
+            const cover = favorite.book_cover_url
+                ? `<img src="${favorite.book_cover_url}" alt="" class="book-cover" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" />`
+                : '';
+            const placeholder = `<div class="book-cover cover-placeholder" style="${favorite.book_cover_url ? 'display:none' : 'display:flex'}">📚</div>`;
+            card.innerHTML = `
+                ${cover}
+                ${placeholder}
+                <button type="button" class="delete-btn" onclick="deleteFavorite(${favorite.id})" aria-label="Удалить">×</button>
+                <div class="book-title" style="font-weight:600;margin-bottom:8px;">${escapeHtml(favorite.book_title)}</div>
+                <div style="color:var(--text-light);margin-bottom:10px;">${escapeHtml(favorite.book_author || 'Автор не указан')}</div>
+                ${favorite.book_year ? `<div style="margin-bottom:10px;">📅 ${favorite.book_year}</div>` : ''}
+                <select class="status-select" onchange="updateStatus(${favorite.id}, this.value)">
+                    <option value="favorite" ${favorite.status === 'favorite' ? 'selected' : ''}>Избранное</option>
+                    <option value="read" ${favorite.status === 'read' ? 'selected' : ''}>Прочитанное</option>
+                    <option value="reading" ${favorite.status === 'reading' ? 'selected' : ''}>В процессе чтения</option>
+                    <option value="planned" ${favorite.status === 'planned' ? 'selected' : ''}>Планируемое для прочтения</option>
+                    <option value="read_complete" ${favorite.status === 'read_complete' ? 'selected' : ''}>Прочтенное</option>
+                </select>
+                ${favorite.book_source_url ? `<a href="${favorite.book_source_url}" target="_blank" rel="noopener" style="display:block;margin-top:10px;color:var(--primary-color);text-decoration:none;">Подробнее</a>` : ''}
+            `;
+            return card;
+        }
+
+        function getStatusFromTab(tab) {
+            const map = { favorite: 'favorite', read: 'read', reading: 'reading', planned: 'planned', read_complete: 'read_complete' };
+            return map[tab] || 'favorite';
+        }
+
+        function switchTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
+            document.querySelectorAll('.favorites-section').forEach(s => s.classList.remove('active'));
+            if (tab === 'settings') {
+                document.getElementById('settingsSection').classList.add('active');
+            } else {
+                document.getElementById(`${tab}Section`).classList.add('active');
+                loadFavorites();
+            }
+        }
+
+        async function updateStatus(favoriteId, newStatus) {
+            try {
+                const response = await fetch(`${API_BASE}/favorites/${favoriteId}/status`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ status: newStatus })
+                });
+                const data = await response.json();
+                if (data.error) { alert('Ошибка при обновлении статуса'); return; }
+                loadFavorites();
+            } catch (e) {
+                alert('Ошибка соединения');
+            }
+        }
+
+        async function deleteFavorite(favoriteId) {
+            if (!confirm('Удалить книгу из избранного?')) return;
+            try {
+                const response = await fetch(`${API_BASE}/favorites/${favoriteId}`, { method: 'DELETE', credentials: 'include' });
+                const data = await response.json();
+                if (data.error) { alert('Ошибка при удалении'); return; }
+                loadFavorites();
+            } catch (e) {
+                alert('Ошибка соединения');
+            }
+        }
+
+        async function logout() {
+            try {
+                await fetch(`${API_BASE}/logout`, { method: 'POST', credentials: 'include' });
+            } catch (e) { /* ignore */ }
+            window.location.href = '/';
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        checkAuth();
+    </script>
+</body>
+</html>

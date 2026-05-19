@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Административная панель</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .admin-container { max-width: 1200px; margin: 50px auto; padding: 40px; }
+        .admin-top { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; margin-bottom: 20px; }
+        .login-form { max-width: 500px; margin: 0 auto; background: var(--card-bg); padding: 40px; border-radius: 15px; box-shadow: var(--shadow); }
+        .form-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+        .form-group label { font-weight: 600; color: var(--text-color); }
+        .form-group input { padding: 12px; border: 2px solid var(--border-color); border-radius: 8px; font-size: 16px; }
+        .form-group input:focus { outline: none; border-color: var(--primary-color); }
+        .submit-btn { padding: 15px; background: var(--primary-color); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; width: 100%; }
+        .submit-btn:hover { background: var(--primary-dark); }
+        .error-message { background: #fee; color: #c33; padding: 12px; border-radius: 8px; margin-bottom: 20px; display: none; }
+        .admin-panel { display: none; }
+        .admin-panel.active { display: block; }
+        .users-table { width: 100%; border-collapse: collapse; background: var(--card-bg); border-radius: 15px; overflow: hidden; box-shadow: var(--shadow); }
+        .users-table th, .users-table td { padding: 12px; text-align: left; border-bottom: 1px solid var(--border-color); font-size: 14px; }
+        .users-table th { background: var(--primary-color); color: white; font-weight: 600; }
+        .users-table tr:hover { background: var(--bg-color); }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .stat-card { background: var(--card-bg); padding: 18px; border-radius: 12px; box-shadow: var(--shadow); text-align: center; }
+        .stat-value { font-size: 28px; font-weight: 700; color: var(--primary-color); }
+        .stat-label { font-size: 13px; color: var(--text-light); margin-top: 4px; }
+        .logout-btn { padding: 10px 20px; background: #e74c3c; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
+        .admin-tabs { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+        .admin-tab { padding: 10px 20px; background: var(--card-bg); border: 2px solid var(--border-color); border-radius: 8px; cursor: pointer; font-weight: 600; }
+        .admin-tab.active { background: var(--primary-color); color: #fff; border-color: var(--primary-color); }
+        .btn-sm { padding: 6px 12px; margin-right: 6px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; }
+        .btn-view { background: var(--primary-color); color: #fff; }
+        .btn-block { background: #c0392b; color: #fff; }
+        .btn-unblock { background: var(--secondary-color); color: #fff; }
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 1000; align-items: center; justify-content: center; padding: 20px; }
+        .modal-overlay.open { display: flex; }
+        .modal-box { background: var(--card-bg); max-width: 640px; width: 100%; max-height: 85vh; overflow: auto; border-radius: 12px; padding: 24px; box-shadow: var(--shadow-hover); }
+        .modal-box h3 { margin-bottom: 12px; }
+        .modal-close { float: right; border: none; background: transparent; font-size: 22px; cursor: pointer; color: var(--text-light); }
+        .admin-search-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 16px; }
+        .admin-search-row input[type="text"] { flex: 1; min-width: 200px; padding: 12px; border: 2px solid var(--border-color); border-radius: 8px; font-size: 16px; }
+        .admin-search-row select { padding: 10px; border-radius: 8px; border: 2px solid var(--border-color); }
+        .admin-hint { color: var(--text-light); font-size: 14px; margin-bottom: 12px; }
+        .fav-mini { font-size: 13px; color: var(--text-light); margin: 4px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="admin-container">
+            <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
+                {% include 'partials/theme_bar.html' %}
+            </div>
+            {% include 'partials/site_branding.html' %}
+            <div id="loginForm" class="login-form">
+                <h1 style="text-align: center; margin-bottom: 30px;">Вход администратора</h1>
+                <div id="errorMessage" class="error-message"></div>
+                <form id="adminLoginForm">
+                    <div class="form-group">
+                        <label for="firstName">Имя</label>
+                        <input type="text" id="firstName" name="firstName" required autocomplete="given-name">
+                    </div>
+                    <div class="form-group">
+                        <label for="lastName">Фамилия</label>
+                        <input type="text" id="lastName" name="lastName" required autocomplete="family-name">
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Пароль</label>
+                        <input type="password" id="password" name="password" required>
+                    </div>
+                    <button type="submit" class="submit-btn">Войти</button>
+                </form>
+            </div>
+
+            <div id="adminPanel" class="admin-panel">
+                <div class="admin-top">
+                    <h1 style="margin:0;">Административная панель</h1>
+                    <button type="button" class="logout-btn" onclick="logout()">Выйти</button>
+                </div>
+
+                <div class="stats" id="stats"></div>
+
+                <div class="admin-tabs">
+                    <button type="button" class="admin-tab active" id="tabActive" onclick="switchAdminTab('active')">Пользователи</button>
+                    <button type="button" class="admin-tab" id="tabBlocked" onclick="switchAdminTab('blocked')">Заблокированные</button>
+                    <button type="button" class="admin-tab" id="tabBooks" onclick="switchAdminTab('books')">Поиск книг</button>
+                </div>
+
+                <div id="usersPanel">
+                    <h2 id="usersTableTitle">Список пользователей</h2>
+                    <table class="users-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Имя</th>
+                                <th>Фамилия</th>
+                                <th>Почта</th>
+                                <th>Регистрация</th>
+                                <th>Админ</th>
+                                <th>Почта подтв.</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersTableBody"></tbody>
+                    </table>
+                </div>
+
+                <div id="booksPanel" style="display: none;">
+                    <h2>Поиск книг</h2>
+                    <p class="admin-hint">Те же источники, что на сайте каталога. Локальная БД — полнотекстовый поиск по загруженным книгам.</p>
+                    <div class="admin-search-row">
+                        <input type="text" id="adminBookQuery" placeholder="Название, автор, фраза…" autocomplete="off">
+                        <select id="adminBookSource" aria-label="Источник">
+                            <option value="openlibrary">Open Library</option>
+                            <option value="gutendex">Gutenberg</option>
+                            <option value="knigafund">Knigafund</option>
+                            <option value="local">Локальная БД</option>
+                        </select>
+                        <button type="button" class="submit-btn" style="width:auto;padding:12px 24px;" onclick="adminRunBookSearch(1)">Найти</button>
+                    </div>
+                    <div id="adminBookMsg" class="error-message" style="display:none;margin-top:12px;"></div>
+                    <div id="adminBooksGrid" class="books-grid" style="margin-top: 20px;"></div>
+                    <div id="adminBooksPagination" class="pagination"></div>
+                </div>
+            </div>
+
+            {% include 'partials/site_footer.html' %}
+        </div>
+    </div>
+
+    <div id="userModal" class="modal-overlay" onclick="if(event.target===this)closeModal()">
+        <div class="modal-box" onclick="event.stopPropagation()">
+            <button type="button" class="modal-close" onclick="closeModal()" aria-label="Закрыть">×</button>
+            <h3>Карточка пользователя</h3>
+            <div id="modalBody"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+        let adminListMode = 'active';
+        let adminBookPage = 1;
+        let adminBookPages = 1;
+
+        async function checkAdminAuth() {
+            try {
+                const response = await fetch(`${API_BASE}/user`, { credentials: 'include' });
+                const data = await response.json();
+                if (data.user && data.user.is_admin) {
+                    showAdminPanel();
+                    await refreshAll();
+                } else {
+                    showLoginForm();
+                }
+            } catch (e) {
+                showLoginForm();
+            }
+        }
+
+        function showLoginForm() {
+            document.getElementById('loginForm').style.display = 'block';
+            document.getElementById('adminPanel').classList.remove('active');
+        }
+
+        function showAdminPanel() {
+            document.getElementById('loginForm').style.display = 'none';
+            document.getElementById('adminPanel').classList.add('active');
+        }
+
+        async function refreshAll() {
+            const [activeRes, blockedRes] = await Promise.all([
+                fetch(`${API_BASE}/admin/users`, { credentials: 'include' }),
+                fetch(`${API_BASE}/admin/users?blocked=1`, { credentials: 'include' })
+            ]);
+            const activeData = await activeRes.json();
+            const blockedData = await blockedRes.json();
+            if (activeData.error || blockedData.error) {
+                if ((activeData.error || '').includes('Admin')) showLoginForm();
+                return;
+            }
+            const nActive = activeData.users.length;
+            const nBlocked = blockedData.users.length;
+            document.getElementById('stats').innerHTML = `
+                <div class="stat-card"><div class="stat-value">${nActive}</div><div class="stat-label">Активных учётных записей</div></div>
+                <div class="stat-card"><div class="stat-value">${nBlocked}</div><div class="stat-label">Заблокировано</div></div>
+                <div class="stat-card"><div class="stat-value">${nActive + nBlocked}</div><div class="stat-label">Всего в базе</div></div>
+            `;
+            if (adminListMode === 'active') {
+                document.getElementById('usersTableTitle').textContent = 'Пользователи (по алфавиту: фамилия, имя)';
+                displayUsers(activeData.users, false);
+            } else if (adminListMode === 'blocked') {
+                document.getElementById('usersTableTitle').textContent = 'Заблокированные пользователи';
+                displayUsers(blockedData.users, true);
+            }
+        }
+
+        function switchAdminTab(mode) {
+            adminListMode = mode;
+            document.getElementById('tabActive').classList.toggle('active', mode === 'active');
+            document.getElementById('tabBlocked').classList.toggle('active', mode === 'blocked');
+            document.getElementById('tabBooks').classList.toggle('active', mode === 'books');
+            const usersPanel = document.getElementById('usersPanel');
+            const booksPanel = document.getElementById('booksPanel');
+            if (mode === 'books') {
+                usersPanel.style.display = 'none';
+                booksPanel.style.display = 'block';
+            } else {
+                usersPanel.style.display = 'block';
+                booksPanel.style.display = 'none';
+                refreshAll();
+            }
+        }
+
+        async function adminRunBookSearch(page) {
+            const q = document.getElementById('adminBookQuery').value.trim();
+            const source = document.getElementById('adminBookSource').value;
+            const msg = document.getElementById('adminBookMsg');
+            const grid = document.getElementById('adminBooksGrid');
+            msg.style.display = 'none';
+            grid.innerHTML = '';
+            document.getElementById('adminBooksPagination').innerHTML = '';
+
+            if (source !== 'local' && !q) {
+                msg.textContent = 'Введите поисковый запрос';
+                msg.style.display = 'block';
+                return;
+            }
+            if (source === 'local' && !q) {
+                msg.textContent = 'Для локальной БД введите текст запроса';
+                msg.style.display = 'block';
+                return;
+            }
+
+            const perPage = 20;
+            adminBookPage = page;
+            const params = new URLSearchParams({ page: String(page), per_page: String(perPage) });
+            if (q) params.set('q', q);
+
+            let url;
+            if (source === 'openlibrary') {
+                url = `${API_BASE}/openlibrary/search?${params}`;
+            } else if (source === 'gutendex') {
+                url = `${API_BASE}/gutendex/search?${params}`;
+            } else if (source === 'knigafund') {
+                url = `${API_BASE}/knigafund/search?${params}`;
+            } else {
+                url = `${API_BASE}/search?${params}`;
+            }
+
+            try {
+                const r = await fetch(url, { credentials: 'include' });
+                const d = await r.json();
+                if (!r.ok) {
+                    msg.textContent = d.error || 'Ошибка запроса';
+                    msg.style.display = 'block';
+                    return;
+                }
+                const books = d.books || [];
+                adminBookPages = d.pages || 1;
+                if (!books.length) {
+                    grid.innerHTML = '<p style="grid-column:1/-1;text-align:center;padding:32px;color:var(--text-light);">Ничего не найдено</p>';
+                    return;
+                }
+                books.forEach(b => {
+                    const el = document.createElement('div');
+                    el.className = 'book-card';
+                    const cover = b.cover_url
+                        ? `<img src="${String(b.cover_url).replace(/"/g, '')}" alt="" class="book-cover" loading="lazy">`
+                        : `<div class="book-cover" style="display:flex;align-items:center;justify-content:center;font-size:48px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;">📚</div>`;
+                    el.innerHTML = cover +
+                        `<div class="book-title">${escapeHtml(b.title || '')}</div>` +
+                        `<div class="book-author">${escapeHtml(b.author || '')}</div>` +
+                        (b.year ? `<div class="book-meta"><span>📅 ${b.year}</span></div>` : '') +
+                        (b.source_url ? `<a href="${String(b.source_url).replace(/"/g, '')}" target="_blank" rel="noopener noreferrer" style="margin-top:10px;color:var(--primary-color);display:inline-block;">Подробнее</a>` : '');
+                    grid.appendChild(el);
+                });
+                adminRenderBookPagination();
+            } catch (e) {
+                msg.textContent = 'Нет связи с сервером';
+                msg.style.display = 'block';
+            }
+        }
+
+        function adminRenderBookPagination() {
+            const wrap = document.getElementById('adminBooksPagination');
+            wrap.innerHTML = '';
+            if (adminBookPages <= 1) return;
+            for (let p = 1; p <= adminBookPages; p++) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = String(p);
+                if (p === adminBookPage) btn.classList.add('active');
+                btn.addEventListener('click', () => adminRunBookSearch(p));
+                wrap.appendChild(btn);
+            }
+        }
+
+        function displayUsers(users, blockedTab) {
+            const tbody = document.getElementById('usersTableBody');
+            tbody.innerHTML = '';
+            if (!users.length) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;">Нет записей</td></tr>';
+                return;
+            }
+            users.forEach(user => {
+                const tr = document.createElement('tr');
+                const actions = blockedTab
+                    ? `<button type="button" class="btn-sm btn-unblock" onclick="unblockUser(${user.id})">Разблокировать</button>`
+                    : (user.is_admin
+                        ? ''
+                        : `<button type="button" class="btn-sm btn-block" onclick="blockUser(${user.id})">Заблокировать</button>`);
+                tr.innerHTML = `
+                    <td>${user.id}</td>
+                    <td>${escapeHtml(user.first_name)}</td>
+                    <td>${escapeHtml(user.last_name)}</td>
+                    <td>${escapeHtml(user.email)}</td>
+                    <td>${user.created_at ? new Date(user.created_at).toLocaleDateString('ru-RU') : ''}</td>
+                    <td>${user.is_admin ? 'да' : 'нет'}</td>
+                    <td>${user.email_verified ? 'да' : 'нет'}</td>
+                    <td>
+                        <button type="button" class="btn-sm btn-view" onclick="viewUser(${user.id})">Просмотр</button>
+                        ${actions}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function viewUser(id) {
+            try {
+                const r = await fetch(`${API_BASE}/admin/users/${id}`, { credentials: 'include' });
+                const d = await r.json();
+                if (!r.ok) {
+                    alert(d.error || 'Ошибка');
+                    return;
+                }
+                const u = d.user;
+                const favs = d.favorites || [];
+                let favHtml = favs.length
+                    ? favs.slice(0, 40).map(f => `<div class="fav-mini">${escapeHtml(f.book_title)} — ${escapeHtml(f.book_author || '')} (${escapeHtml(f.status)})</div>`).join('')
+                    : '<p class="fav-mini">Нет записей в избранном</p>';
+                if (favs.length > 40) favHtml += `<p class="fav-mini">Показаны первые 40 из ${favs.length}</p>`;
+                document.getElementById('modalBody').innerHTML = `
+                    <p><strong>ID:</strong> ${u.id}</p>
+                    <p><strong>Имя:</strong> ${escapeHtml(u.first_name)}</p>
+                    <p><strong>Фамилия:</strong> ${escapeHtml(u.last_name)}</p>
+                    <p><strong>Почта:</strong> ${escapeHtml(u.email)}</p>
+                    <p><strong>Администратор:</strong> ${u.is_admin ? 'да' : 'нет'}</p>
+                    <p><strong>Почта подтверждена:</strong> ${u.email_verified ? 'да' : 'нет'}</p>
+                    <p><strong>Заблокирован:</strong> ${u.is_blocked ? 'да' : 'нет'}</p>
+                    <p><strong>Дата регистрации:</strong> ${u.created_at ? new Date(u.created_at).toLocaleString('ru-RU') : ''}</p>
+                    <h4 style="margin-top:16px;">Избранное</h4>
+                    ${favHtml}
+                `;
+                document.getElementById('userModal').classList.add('open');
+            } catch (e) {
+                alert('Ошибка соединения');
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('userModal').classList.remove('open');
+        }
+
+        async function blockUser(id) {
+            if (!confirm('Заблокировать пользователя?')) return;
+            try {
+                const r = await fetch(`${API_BASE}/admin/users/${id}/block`, { method: 'POST', credentials: 'include' });
+                const d = await r.json();
+                if (!r.ok) { alert(d.error || 'Ошибка'); return; }
+                await refreshAll();
+            } catch (e) {
+                alert('Ошибка соединения');
+            }
+        }
+
+        async function unblockUser(id) {
+            if (!confirm('Снять блокировку?')) return;
+            try {
+                const r = await fetch(`${API_BASE}/admin/users/${id}/unblock`, { method: 'POST', credentials: 'include' });
+                const d = await r.json();
+                if (!r.ok) { alert(d.error || 'Ошибка'); return; }
+                await refreshAll();
+            } catch (e) {
+                alert('Ошибка соединения');
+            }
+        }
+
+        document.getElementById('adminLoginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.style.display = 'none';
+            const formData = {
+                first_name: document.getElementById('firstName').value.trim(),
+                last_name: document.getElementById('lastName').value.trim(),
+                password: document.getElementById('password').value
+            };
+            if (!formData.first_name || !formData.last_name || !formData.password) {
+                errorDiv.textContent = 'Заполните все поля';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            try {
+                const response = await fetch(`${API_BASE}/admin/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify(formData)
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    errorDiv.textContent = data.error || 'Ошибка входа';
+                    errorDiv.style.display = 'block';
+                    return;
+                }
+                showAdminPanel();
+                await refreshAll();
+            } catch (err) {
+                errorDiv.textContent = 'Сервер недоступен (порт 5001).';
+                errorDiv.style.display = 'block';
+            }
+        });
+
+        async function logout() {
+            try {
+                await fetch(`${API_BASE}/logout`, { method: 'POST', credentials: 'include' });
+            } catch (e) { /* ignore */ }
+            showLoginForm();
+            document.getElementById('adminLoginForm').reset();
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        checkAdminAuth();
+        (function () {
+            const inp = document.getElementById('adminBookQuery');
+            if (inp) {
+                inp.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        adminRunBookSearch(1);
+                    }
+                });
+            }
+        })();
+    </script>
+</body>
+</html>

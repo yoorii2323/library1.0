@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Цифровой каталог библиотеки - Поиск книг</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-toolbar">
+                <div class="header-toolbar-spacer" aria-hidden="true"></div>
+                <div class="header-actions">
+                    {% include 'partials/theme_bar.html' %}
+                    <div class="lang-switcher">
+                    <label for="langSelect" class="visually-hidden">Language</label>
+                    <select id="langSelect" aria-label="Language selector">
+                        <option value="ru">RU</option>
+                        <option value="en">EN</option>
+                    </select>
+                    <a href="/register" id="registerBtn" class="register-btn" style="margin-left: 10px; padding: 6px 12px; background: var(--primary-color); color: white; text-decoration: none; border-radius: 8px; font-size: 14px;">Вход / Регистрация</a>
+                    <a href="/profile" id="profileBtn" class="profile-btn" style="margin-left: 10px; padding: 6px 12px; background: var(--secondary-color); color: white; text-decoration: none; border-radius: 8px; font-size: 14px; display: none;">Профиль</a>
+                    </div>
+                </div>
+            </div>
+            <div class="site-brand-block site-brand-block--featured">
+                <h1 id="titleText" class="site-main-title">📚 Цифровой каталог библиотеки</h1>
+                <p id="subtitleText" class="subtitle site-tagline">Система полнотекстового поиска литературы</p>
+            </div>
+            <nav class="nav">
+                <a href="/" id="navHome">На главную</a>
+                <a href="#topSection" id="navPopular">Популярные</a>
+                <a href="/profile?tab=favorite" id="navFavorites" style="display: none;">Избранное</a>
+                <a href="#searchForm" id="navSearch">Поиск</a>
+            </nav>
+        </header>
+
+        <div class="search-section">
+            <form id="searchForm" class="search-form">
+                <div class="search-input-wrapper">
+                    <input 
+                        type="text" 
+                        id="searchInput" 
+                        placeholder="Введите название книги, автора, жанр или любую фразу для поиска..."
+                        autocomplete="off"
+                    >
+                    <button type="submit" class="search-btn"><span class="search-btn-icon" aria-hidden="true">🔍</span><span id="searchBtnLabel"> Найти</span></button>
+                </div>
+                
+                <div class="filters">
+                    <div class="filter-group">
+                        <label for="sourceSelect" id="sourceLabel">Источник:</label>
+                        <select id="sourceSelect">
+                            <option value="aggregate" id="sourceAll">Все источники</option>
+                            <option value="openlibrary">Open Library</option>
+                            <option value="gutendex">Gutenberg</option>
+                            <option value="knigafund">Knigafund</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="genreFilter" id="genreLabel">Жанр:</label>
+                        <select id="genreFilter">
+                            <option value="" id="allGenresOption">Все жанры</option>
+                        </select>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <label for="yearFrom" id="yearFromLabel">Год от:</label>
+                        <input type="number" id="yearFrom" placeholder="1900" min="1000" max="2100">
+                    </div>
+                    
+                    <div class="filter-group">
+                        <label for="yearTo" id="yearToLabel">Год до:</label>
+                        <input type="number" id="yearTo" placeholder="2024" min="1000" max="2100">
+                    </div>
+                    
+                    <button type="button" id="clearFilters" class="clear-btn">Очистить фильтры</button>
+                </div>
+            </form>
+        </div>
+
+        <div id="loading" class="loading hidden">
+            <div class="spinner"></div>
+            <p>Поиск...</p>
+        </div>
+
+        <div id="resultsSection" class="results-section hidden">
+            <div class="results-header">
+                <h2 id="resultsTitle">Результаты поиска</h2>
+                <div class="results-info">
+                    <span id="resultsCount"></span>
+                </div>
+            </div>
+            
+            <div id="booksGrid" class="books-grid">
+                <!-- Книги будут добавлены через JavaScript -->
+            </div>
+            
+            <div id="pagination" class="pagination">
+                <!-- Пагинация будет добавлена через JavaScript -->
+            </div>
+        </div>
+
+        <div id="emptyState" class="empty-state">
+            <div class="empty-icon" aria-hidden="true">📖</div>
+            <h3>Начните поиск</h3>
+            <p>Введите запрос в поле поиска, чтобы найти интересующие вас книги</p>
+        </div>
+
+        <section id="topSection" class="results-section">
+            <div class="results-header">
+                <h2 id="popularTitle">Популярные книги</h2>
+                <div class="results-info">
+                    <span id="popularSubtitle">Тренды недели</span>
+                </div>
+            </div>
+            <div id="topBooksGrid" class="books-grid">
+                <!-- Топ книги будут добавлены через JavaScript -->
+            </div>
+        </section>
+
+        <div id="errorMessage" class="error-message hidden"></div>
+
+        {% include 'partials/site_footer.html' %}
+    </div>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
+
